@@ -1,0 +1,773 @@
+---
+title: "SMI 205 Replication Project"
+author: "190230838"
+date: "5/20/2021"
+output: html_document
+---
+
+# SMI 205 Replication Project
+
+### Rpubs:
+### GitHub:
+
+## Replicated Paper
+Mellon, J. and Prosser, C., 2017. Twitter and Facebook are not representative of the general population: Political attitudes and demographics of British social media users. Research & Politics, 4(3), p.2053168017720008.
+https://doi.org/10.1177/2053168017720008
+
+
+### Workspace setup
+```{r echo=TRUE, warning=FALSE, error=FALSE, message=FALSE}
+library(dplyr)
+library(haven)
+library(foreign)
+library(xfun)
+library(htmltools)
+library(sjPlot)
+library(sjmisc)
+library(sjlabelled)
+library(ggplot2)
+library(coefplot)
+library(gridExtra)
+```
+
+
+# Introduction 
+
+The findings of Mellon and Prosser (2017) did not diverge from what had been found previously. Hargittai (2015) found that age was the most significant predictor of social media usage. Facebook and twitter users were younger, with women more likely to use Facebook. These findings were reiterated by Blank and Lutz (2016), who found UK Twitter users to be younger and wealthier whilst Facebook users were more likely to be younger, female and less educated than the general population.  Whilst previous literature has shown social media users to be unrepresentative, social media usage is always changing. Social media users in the UK number 49 million as of 2021, whilst this number was 38 million in 2015 (Statista 2021).  Facebook is the largest social network in the UK, with a 52% market share, followed by twitter with 25%.  As the number of social media users increase, the representativeness of social media users is likely to change. Therefore, this replication aims to test the replicability of previous findings. It aims to understand if there have been any significant changes regarding the generalisability of British social media users in recent years. Understanding the generalisability of social media users can be significant, particularly in politics, where a significant majority of campaigning is conducted.
+
+Since 2015, the British political landscape has differed significantly. The influence of the EU referendum of 2016 and the 2017 and 2019 general elections on British political attitude are unaccounted for in the 2015 BES data. Hobolt et al (2018) revealed that around three quarters of British citizens identified as either a Remainer or a Leaver, and that these identities cut across party lines. They also showed that these remain/leave identities translated into animosity and stereotyping of the opposite side. This shows that the even after the referendum, the British public remained deeply divided on the issue. Therefore, any modern analysis of British political attitude has to account for the influence of Brexit. 
+
+The authors fail to control for income when looking at the influence of social media on political attention. Income has been shown to be a positive predictor of political attitudes in the UK (Evans and Tilley 2012) and should therefore be controlled for. Using Freese and Peterson’s (2017) classification system, the type of replication conducted would be a test of repeatability. This replication will use more recent data in order to see if the same reported effects can still be observed. To see if, when controlling for a range of demographic factors, with the addition of income and EU vote choice, that twitter use is a significant predictor of political attention.
+
+
+
+# Data and Methods
+
+## Data 
+The data used in the original paper is from the BES 2015 post-election survey.  The survey is an address-based random probability sample of eligible voters in the UK, conducted post-election, with the aim of providing a “snap -shot” of the population. There are 2987 observations in the 2015 dataset. There were six independent variables used in the original paper. Three demographic, age, gender, and education level, and the two social media usage questions. These questions asked respondents whether they used twitter or Facebook. The dependent variable used is political attention. Respondents were asked, on a scale from 0-10, how much attention they paid to politics. 
+
+*“How much attention do you generally pay to politics?” 
++0 – Pay no attention 
++10- Pay a great deal of attention
+
+The data that will be used in this replication are the 2017 and 2019 BES post-election surveys. The 2017 dataset has a total of 2194 observations whilst the 2019 dataset has 3946 observations. Apart from the independent variables used in the original paper, this replication will control for income and EU vote choice. 
+
+
+
+#### Loading datasets
+
+```{r echo=TRUE, results='hide'}
+bes2017<-read.dta("bes_f2f_2017_v1.5.dta")
+
+bes2019<-read_dta("bes_rps_2019_1.0.0.dta")
+
+```
+
+
+
+
+
+
+#### Dummy coding twitter variable 
+
+```{r echo=TRUE, results='hide'}
+
+bes2017$twitter[bes2017$k06 == "Yes"]<-1
+bes2017$twitter[bes2017$k06 == "Don`t know"]<-NA
+bes2017$twitter[bes2017$k06 == "No"]<-0
+
+
+
+bes2019$twitter[bes2019$k06 == 1]<-1
+bes2019$twitter[bes2019$k06 == -1]<-NA
+bes2019$twitter[bes2019$k06 == 2]<-0
+
+
+
+```
+
+
+#### Dummy coding FB variable
+
+```{r echo=TRUE, results='hide'}
+bes2017$FB[bes2017$k08 == "No"]<-0
+bes2017$FB[bes2017$k08 == "Yes"]<-1
+bes2017$FB[bes2017$k08 == "Don`t know"]<-NA
+
+
+bes2019$FB[bes2019$k08 == -1]<-NA
+bes2019$FB[bes2019$k08 == 1]<-1
+bes2019$FB[bes2019$k08 == 2]<-0
+
+```
+
+
+####  Recoding education variable
+
+The education variable was recoded into a factor variable, with "no qualifications" as the base category. The new variable is called "EducationLevel".
+```{r, echo=TRUE, results='hide'}
+
+bes2017<-bes2017%>% mutate(
+  EducationLevel = case_when(
+    education == "No qualification" ~ "no qualifications",
+    education == "GCSE D-G, CSE grades 2-5, O level D-E"|
+      education == "Youth training certificate, skill seekers"|
+      education == "Clerical and commercial qualifications"~ "GCSE D-G",
+    education == "GCSE A*-C, CSE grade 1, O level grade A-C"|
+      education == "Scottish Standard grades, Ordinary bands"|
+      education == "Recognised trade apprenticeship"|
+      education == "City&Guilds level 1, NVQ/SVQ 1 and equivalent"~"GCSE A*-C",
+    education == "A level or equivalent"|
+      education == "Scottish Higher or equivalent"|
+      education == "City&Guilds level 2, NVQ/SVQ 2 and equivalent"|
+      education == "HNC/HND, City&Guilds level 4, NVQ/SVQ 4/5"|
+      education == "ONC/OND, City&Guilds level 3, NVQ/SVQ 3"~ "A level",
+    education == "Univ/poly diploma"|
+      education == "First degree"|
+      education == "Nursing qualification"|
+      education == "Teaching qualification" ~ "Undergraduate",
+    education == "Postgraduate degree"~ "Postgraduate",
+    education == "Other technical, professional or higher qualification"|
+      education == "AAT/ACA/ Accountancy qualifications"|
+      education == "hgv" |
+      education == "Refused" ~ "Other"))
+
+bes2017$EducationLevel[bes2017$EducationLevel == "Other"]<-NA
+bes2017$EducationLevel<-as.factor(bes2017$EducationLevel)
+bes2017$EducationLevel<-factor(bes2017$EducationLevel, levels = c("no qualifications",
+                                                          "GCSE D-G",
+                                                          "GCSE A*-C",
+                                                          "A level",
+                                                          "Undergraduate",
+                                                          "Postgraduate"))
+
+
+bes2019<-bes2019%>% mutate(
+  EducationLevel = case_when(
+    education == 0 ~ "no qualifications",
+    education == 12|
+      education == 17|
+      education == 15 ~ "GCSE D-G",
+    education == 10|
+      education == 11|
+      education == 16|
+      education == 14 ~ "GCSE A*-C",
+    education == 7|
+      education == 8|
+      education == 13|
+      education == 6|
+      education == 9~ "A level",
+    education == 3|
+      education == 2|
+      education == 5|
+      education == 4 ~ "Undergraduate",
+    education == 1 ~ "Postgraduate",
+    education == 18|
+      education == 19|
+      education == -2 |
+      education == -1 ~ "Other"))
+
+
+bes2019$EducationLevel[bes2019$EducationLevel == "Other"]<-NA
+bes2019$EducationLevel<-as.factor(bes2019$EducationLevel)
+bes2019$EducationLevel<-factor(bes2019$EducationLevel, levels = c("no qualifications",
+                                                          "GCSE D-G",
+                                                          "GCSE A*-C",
+                                                          "A level",
+                                                          "Undergraduate",
+                                                          "Postgraduate"))
+
+```
+
+
+
+#### Dummy code gender variable 
+
+
+```{r echo=TRUE, results='hide'}
+bes2017$gender = 0
+bes2017$gender[bes2017$y09 == "Female"]<-1
+
+bes2019$gender[bes2019$y09 == 1]<-0
+bes2019$gender[bes2019$y09 == 2]<-1
+bes2019$gender[bes2019$y09 == 3]<-NA
+bes2019$gender[bes2019$y09 == 4]<-NA
+```
+
+
+#### Remove missing age 
+```{r}
+bes2017$Age[bes2017$Age == -1]<-NA
+bes2017$Age[bes2017$Age == -2]<-NA
+
+bes2019$Age[bes2019$Age == -999]<-NA
+bes2019$Age[bes2019$Age == -2]<-NA
+```
+
+
+
+
+#### Income with nonresponse category
+
+For the income variable there were a high number of nonresponses for both datasets. In order to account for this, the income variable was coded into a factor variable of six levels with a nonresponse category as the sixth level.The new income variable is called "IncomeNonresp"
+
+```{r echo=TRUE, results='hide'}
+
+table(bes2017$y01)
+bes2017<-bes2017%>% mutate(
+  IncomeNonresp = case_when(
+    y01 == "Refused"|y01 == "Don`t know" ~ "Nonresponse",
+    y01 == "Under GBP 2,600"|y01 == "GBP 2,600 - GBP 5,199" ~ "Under £5,200",
+    y01 == "GBP 5,200 - GBP 10,399"| y01 == "GBP 10,400 - GBP 15,599"| y01 == "GBP 15,600 - GBP 20,799"| y01 == "GBP 20,800 - GBP 25,999"~ "£5,200 - £25,999",
+   y01 == "GBP 26,000 - GBP 31,199"|y01 == "GBP 31,200 - GBP 36,399"|y01== "GBP 36,400 - GBP 39,999"|y01== "GBP 40,000 - GBP 44,999" ~ "£26,000 - £44,999",
+    y01 == "GBP 45,000 - GBP 49,999"| y01 =="GBP 50,000 - GBP 59,999"| y01 == "GBP 60,000 - GBP 74,999"|y01 == "GBP 75,000 - GBP 99,999" ~ "£45,000 - £99,999",
+  y01=="GBP 100,000 or more"~"£100,000 or more"))
+    
+bes2017$IncomeNonresp<-as.factor(bes2017$IncomeNonresp) 
+
+bes2017$IncomeNonresp<-factor(bes2017$IncomeNonresp, levels = c("Under £5,200",
+                                                                "£5,200 - £25,999",
+                                                                "£26,000 - £44,999",
+                                                                  "£45,000 - £99,999",
+                                                                "£100,000 or more",
+                                                                "Nonresponse"))
+                                                              
+
+table(bes2019$y01_Annual)
+bes2019<-bes2019%>%mutate(
+  IncomeNonresp = case_when(
+    y01_Annual == -999|y01_Annual == -2|y01_Annual == -1 ~ "Nonresponse",
+    y01_Annual == 1 ~ "Under£5,200",
+    y01_Annual == 2|y01_Annual == 3 ~ "£5200-£25,999",
+    y01_Annual == 4|y01_Annual == 5 ~ "£26,000 - £46,799",
+    y01_Annual == 6|y01_Annual == 7 ~ "£46,800 - £149,999",
+    y01_Annual == 8 ~ "£150,000 or more"))
+bes2019$IncomeNonresp<-as.factor(bes2019$IncomeNonresp)
+bes2019$IncomeNonresp<-factor(bes2019$IncomeNonresp, levels = c("Under£5,200",
+                                                                "£5200-£25,999",
+                                                                "£26,000 - £46,799",
+                                                                "£46,800 - £149,999",
+                                                                "£150,000 or more",
+                                                                "Nonresponse"))
+
+
+
+```
+
+
+
+#### EU vote variable
+
+The EU vote choice variable was binary coded into a new variable called "EUleave", where those who voted "Leave" in 2016 were assigned 1.
+
+```{r echo=TRUE, results='hide'}
+bes2017$EUleave = 0
+bes2017$EUleave[bes2017$p01 == "Leave the EU"]<-1
+bes2017$EUleave[bes2017$p01 == "Don`t know"]<-NA
+bes2017$EUleave[bes2017$p01 == "I did not vote"]<-NA
+
+
+bes2019$EUleave = 0
+bes2019$EUleave[bes2019$p01 == 2]<-1
+bes2019$EUleave[bes2019$p01 == -1]<-NA
+bes2019$EUleave[bes2019$p01 == 1]<-NA
+bes2019$EUleave[bes2019$p01 == -999]<-NA
+
+
+```
+
+
+
+#### Recode political attention variable
+
+ A new variable was created called "polattention" using the k01 variable, where 0 means "Pay no attention" and 10 was "Pay a great deal of attention".The "polattention" variable was then converted into a numeric variable. 
+
+```{r echo=TRUE, results='hide', warning=FALSE}
+
+bes2017$polattention = bes2017$k01
+bes2017$polattention[bes2017$polattention == "Don't know"]<-NA
+bes2017$polattention[bes2017$polattention == "Pay no attention"]<-0
+bes2017$polattention[bes2017$polattention == "Pay a great deal of attention"]<-10
+bes2017$polattention[bes2017$polattention == "Don`t know"]<-NA
+bes2017$polattention[bes2017$polattention == "Not stated"]<-NA
+bes2017$polattention<-as.numeric(bes2017$polattention)
+
+bes2019$k01[bes2019$k01 == -999]<-NA
+bes2019$k01[bes2019$k01 == -1]<-NA
+bes2019$polattention = bes2019$k01
+bes2019$polattention <- as.numeric(bes2019$polattention)
+
+```
+
+
+
+
+#####  Creating new dataset with variables
+
+Two new datasets,for both 2017 and 2019, were created with the necessary variables for the regression analysis of political attention. These were bes17 and bes19
+```{r}
+
+bes17 = subset(bes2017, select = c(twitter, FB, EducationLevel, gender, Age, polattention, IncomeNonresp,EUleave,wt_demog))
+
+
+bes19 = subset(bes2019, select = c(twitter, FB, EducationLevel, gender, Age, polattention, IncomeNonresp,EUleave, wt_demog,finalserialno))
+
+
+```
+
+
+### Summary Statistics
+
+
+#####  Age distribution of respondents
+```{r}
+
+hist(bes17$Age, col = "blue", border = "grey",
+     main="Figure 1. Age distribution of respondents", xlab="Age", xlim=c(15,100))
+
+
+```
+
+
+
+##### Income of respondents
+
+```{r}
+
+income_table17<-round(rbind(table(bes17$IncomeNonresp),
+                          prop.table(table(bes17$IncomeNonresp)),
+                          prop.table(table(bes17$IncomeNonresp))*100),2)
+rownames(income_table17) <- c("Count",                   
+                          "Proportion",
+                          "Percentage")
+
+income_table19<-round(rbind(table(bes19$IncomeNonresp),
+                          prop.table(table(bes19$IncomeNonresp)),
+                          prop.table(table(bes19$IncomeNonresp))*100),2)
+
+rownames(income_table19) <- c("Count",                   
+                          "Proportion",
+                          "Percentage")
+
+income_table17
+income_table19
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+## Methods 
+
+Graphical representations are used to examine representativeness of social media users across age, gender, and education. This replication will employ the same method, but will include the income variable. The code used below to create the graphs were developed by the original authors Mellon and Prosser (2017). This replication employed the same code but using the 2017 and 2019 datasets as well as the income variable.
+
+ OLS regression models are used to predict political attention using social media usage whilst controlling for demographics. This replication will carry out the same OLS regression method using the same variables but will also control for income and EU referendum vote choice. In the original paper, the weighting that was used was the combined main study weight (capped selection plus uncapped demographic weights). This replication uses the same type of weighting, *wt_demog*.
+
+
+# Results
+
+
+### Representativeness of social media users (2017)
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+
+labelDataset <- function(data) {
+   correctLabel <- function(x) {
+     if(!is.null(attributes(x)$labels)) {
+       class(attributes(x)$labels) <- typeof(x)
+     }
+     return(x)
+   }
+   for(i in colnames(data)) {
+     data[, i] <- correctLabel(data[, i])
+   }
+   return(data)
+ }
+
+bes2017$twitterUse=bes2017$twitter
+bes2017$fbUse=bes2017$FB
+
+bes <- labelDataset(bes2017)
+bes$Age[bes$Age < 18] <- NA
+
+bes$twitterUse <- as.character(bes$twitterUse)
+bes$twitterUse[bes$twitterUse=="0"] <- "No"
+bes$twitterUse[bes$twitterUse=="1"] <- "Yes"
+bes$twitterUse[bes$twitterUse=="Don't know"] <- NA
+bes$fbUse <- as.character(bes$fbUse)
+bes$fbUse[bes$fbUse=="0"] <- "No"
+bes$fbUse[bes$fbUse=="1"] <- "Yes"
+bes$fbUse[bes$fbUse=="Don't know"] <- NA
+
+bes$Age <- as.numeric(bes$Age)
+
+bes.2 <- bes
+bes.2$twitterUse <- "Population"
+
+bes.2$fbUse <- "Population"
+bes.1 <- bes
+bes <- rbind(bes.1, bes.2)
+bes$twitterUse[which(bes$twitterUse=="Yes")] <- "Twitter user"
+bes$twitterUse[which(bes$twitterUse=="No")] <- "Non-user"
+bes$twitterUse <- factor(bes$twitterUse, levels = c("Population",
+                                                    "Twitter user", "Non-user"))
+
+bes$fbUse[which(bes$fbUse=="Yes")] <- "Facebook user"
+bes$fbUse[which(bes$fbUse=="No")] <- "Non-user"
+bes$fbUse <- factor(bes$fbUse, levels = c("Population",
+                                          "Facebook user", "Non-user"))
+
+bes$polattention[bes$polattention=="Don't know"] <- NA
+
+bes$Group <- bes$twitterUse
+bes$gender <- as.character(bes$gender)
+bes$gender[bes$gender=="1"] <- "Female"
+bes$gender[bes$gender=="0"] <- "Male"
+
+
+
+xBySoc <- function(xvar, socMedia, formula) {
+  library(survey)
+  bes.design <- svydesign(id = bes$finalserialno, 
+                          weights = bes$wt_demog,
+                          data = bes<-subset(bes,!is.na(wt_demog)))
+  ed.sm <- prop.table(svytable(design = bes.design, 
+                                    formula = formula), 1)
+  
+  library(reshape)
+  ed.sm <- melt(ed.sm)
+  colnames(ed.sm) <- c("Group", "xvar", "prop")
+  ed.sm$xvar <- factor(ed.sm$xvar, levels = unique(ed.sm$xvar))
+  ed.sm$Group <- factor(ed.sm$Group, levels = unique(ed.sm$Group))
+  
+  bar.plot <- ggplot(ed.sm, aes(x = xvar, y = prop, group = Group, fill = Group)) + 
+    geom_bar(stat = "identity", position = "dodge", colour = "black", width = 0.75) + theme_bw()+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) + ylab("Proportion")
+  return(bar.plot)
+}
+
+
+gender.twitter.17 <- xBySoc(xvar = "gender", socMedia = "twitterUse",
+                         formula = ~twitterUse + gender) + xlab("Gender")
+gender.fb.17 <- xBySoc(xvar = "gender", socMedia = "fbUse",
+                    formula = ~fbUse + gender) + xlab("Gender")
+
+
+ed.twitter.17 <- xBySoc(xvar = "EducationLevel", socMedia = "twitterUse", 
+       formula = ~twitterUse + EducationLevel) + xlab("Education")
+ed.fb.17 <- xBySoc(xvar = "EducationLevel", socMedia = "fbUse", 
+       formula = ~fbUse + EducationLevel) + xlab("Education")
+
+
+income.twitter.17 <- xBySoc(xvar = "IncomeNonresp", socMedia = "twitterUse", 
+                     formula = ~twitterUse + IncomeNonresp) + xlab("Income")
+income.fb.17 <- xBySoc(xvar = "IncomeNonresp", socMedia = "fbUse", 
+                formula = ~fbUse + IncomeNonresp) + xlab("Income")
+
+
+```
+
+
+
+
+#### Age 
+
+The average age of respondents in the 2017 dataset was 52 years. Both the average ages of twitter and facebook users were younger than the average of the population and non users. Twitter users had a mean age of 39 years whilst for facebook users it was 45 years. Social media users tend to be younger than the general population.
+```{r}
+mean(bes17$Age, na.rm = TRUE)                    ### Mean age of entire population
+mean(bes17$Age[bes17$twitter ==1], na.rm = TRUE) ### Mean age of twitter users
+mean(bes17$Age[bes17$twitter == 0], na.rm = TRUE)### Mean age of twitter non users
+
+mean(bes17$Age[bes17$FB==1], na.rm = TRUE)       ### Mean age of facebook users
+mean(bes17$Age[bes17$FB==0], na.rm = TRUE)       ### Mean age of facebook non users
+
+
+```
+
+
+
+
+
+
+
+#### Gender, education and income
+
+Facebook users were slightly more female than the rest of the population whilst twitter was more representative of gender. Twitter users were significantly better educated and more likely to have a university degree. Twitter users were wealthier, being overrepresented in the higher income categories. Users were more likely to respond to the income question than nonusers.
+
+```{r, echo=FALSE}
+grid.arrange(gender.fb.17, gender.twitter.17,
+             ed.fb.17, ed.twitter.17)
+
+grid.arrange(income.fb.17,income.twitter.17)
+```
+Based on Mellon and Prosser(2017)
+
+
+
+
+
+
+
+
+
+### Representativeness of social media users (2019)
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+
+
+bes2019$twitterUse[bes2019$twitter=="0"] <- "No"
+bes2019$twitterUse[bes2019$twitter=="1"] <- "Yes"
+bes2019$twitterUse[bes2019$twitter=="Don't know"] <- NA
+
+bes2019$fbUse[bes2019$FB=="0"] <- "No"
+bes2019$fbUse[bes2019$FB=="1"] <- "Yes"
+bes2019$fbUse[bes2019$FB=="Don't know"] <- NA
+bes2019$Age<-as.numeric(bes2019$Age)
+
+bes2019$twitterUse <- as.character(bes2019$twitterUse)
+bes2019$fbUse <- as.character(bes2019$fbUse)
+
+bes19$twitterUse = bes2019$twitterUse
+bes19$fbUse = bes2019$fbUse
+
+
+bes.a<-bes19
+bes.a$twitterUse<-"Population"
+bes.a$fbUse<-"Population"
+bes.b<-bes19
+bes.c<-rbind(bes.a,e=bes.b)
+
+bes.c$twitterUse[which(bes.c$twitterUse=="Yes")] <- "Twitter user"
+bes.c$twitterUse[which(bes.c$twitterUse=="No")] <- "Non-user"
+bes.c$twitterUse <- factor(bes.c$twitterUse, levels = c("Population",
+                                                    "Twitter user", "Non-user"))
+
+bes.c$fbUse[which(bes.c$fbUse=="Yes")] <- "Facebook user"
+bes.c$fbUse[which(bes.c$fbUse=="No")] <- "Non-user"
+bes.c$fbUse <- factor(bes.c$fbUse, levels = c("Population",
+                                          "Facebook user", "Non-user"))
+
+
+bes.c$Group <- bes.c$twitterUse
+bes.c$gender <- as.character(bes.c$gender)
+bes.c$gender[bes.c$gender=="1"] <- "Female"
+bes.c$gender[bes.c$gender=="0"] <- "Male"
+
+
+
+
+xBySoc.c <- function(xvar, socMedia, formula) {
+  library(survey)
+  bes.design <- svydesign(id = bes.c$finalserialno, 
+                          weights = bes.c$wt_demog,
+                          data = bes.c<-subset(bes.c,!is.na(wt_demog)))
+  ed.sm <- prop.table(svytable(design = bes.design, 
+                                    formula = formula), 1)
+  
+  library(reshape)
+  ed.sm <- melt(ed.sm)
+  colnames(ed.sm) <- c("Group", "xvar", "prop")
+  ed.sm$xvar <- factor(ed.sm$xvar, levels = unique(ed.sm$xvar))
+  ed.sm$Group <- factor(ed.sm$Group, levels = unique(ed.sm$Group))
+  
+  bar.plot <- ggplot(ed.sm, aes(x = xvar, y = prop, group = Group, fill = Group)) + 
+    geom_bar(stat = "identity", position = "dodge", colour = "black", width = 0.75) + theme_bw()+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) + ylab("Proportion")
+  return(bar.plot)
+}
+
+
+gender.twitter.19 <- xBySoc.c(xvar = "gender", socMedia = "twitterUse",
+                         formula = ~twitterUse + gender) + xlab("Gender")
+gender.fb.19<-xBySoc.c(xvar = "gender", socMedia = "fbUse",
+                         formula = ~fbUse + gender) + xlab("Gender")
+
+
+
+ed.twitter.19 <- xBySoc.c(xvar = "EducationLevel", socMedia = "twitterUse", 
+       formula = ~twitterUse + EducationLevel) + xlab("Education")
+ed.fb.19 <- xBySoc.c(xvar = "EducationLevel", socMedia = "fbUse", 
+       formula = ~fbUse + EducationLevel) + xlab("Education")
+
+
+income.twitter.19 <- xBySoc.c(xvar = "IncomeNonresp", socMedia = "twitterUse", 
+                     formula = ~twitterUse + IncomeNonresp) + xlab("Income")
+income.fb.19 <- xBySoc.c(xvar = "IncomeNonresp", socMedia = "fbUse", 
+                formula = ~fbUse + IncomeNonresp) + xlab("Income")
+
+
+
+
+
+```
+
+
+
+#### Age
+
+Representativeness of social media users did not differ much between 2017 and 2019. The average age was the same, 52 years. Twitter and Facebook users were again found to be younger than the general population and non-users. The mean age for twitter users is 41 years and 46 years for Facebook users. We can see that the average age of users has gone up slightly since 2017 but is still considerably younger than the average age for the entire dataset. 
+
+```{r}
+
+mean(bes19$Age, na.rm = TRUE)                       ### Mean age of entire population
+
+mean(bes19$Age[bes19$twitter ==1], na.rm = TRUE)    ### Mean age of twitter users
+mean(bes19$Age[bes19$twitter == 0], na.rm = TRUE)   ### Mean age of twitter non users
+
+mean(bes19$Age[bes19$FB==1], na.rm = TRUE)          ### Mean age of facebook users
+mean(bes19$Age[bes19$FB==0], na.rm = TRUE)          ### Mean age of facebook non users
+
+
+```
+
+
+
+
+
+#### Gender,education and income
+
+Again, Facebook users were slightly more female whilst twitter users were better educated, particularly at the university level, and were wealthier being overrepresented in the higher income groups. Again, social media users were more likely to respond to the income question.
+
+```{r}
+
+grid.arrange(gender.fb.19,gender.twitter.19,
+             ed.fb.19, ed.twitter.19)
+
+grid.arrange(income.fb.19,income.twitter.19)
+
+```
+Based on Mellon and Prosser(2017)
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+### OLS Regression models 
+
+#### 2017 models
+```{r echo=TRUE, results='hide'}
+
+### Facebook models
+polattFB17.1<-lm(data =subset(bes17, FB = 1),polattention~Age+gender+EducationLevel+FB, weights = wt_demog)   ## Original variables
+polattFB17.2<-lm(data = subset(bes17, FB = 1),polattention~Age+gender+EducationLevel+IncomeNonresp+FB,weights = wt_demog) ## Added income variable
+polattFB17.3<-lm(data = subset(bes17, FB = 1),polattention~Age+gender+EducationLevel+EUleave+FB,weights = wt_demog) ## Added EU variable
+polattFB17.4<-lm(data = subset(bes17,FB=1),polattention~Age+gender+EducationLevel+IncomeNonresp+EUleave+FB,weights = wt_demog)## Added both EU and income
+
+### Twitter models
+polatttwitter17.1<-lm(data = subset(bes17,twitter=1),polattention~Age+gender+EducationLevel+twitter,weights = wt_demog) ## Original variables
+polatttwitter17.2<-lm(data =subset(bes17,twitter=1),polattention~Age+gender+EducationLevel+IncomeNonresp+twitter,weights = wt_demog) ## Added income
+polatttwitter17.3<-lm(data = subset(bes17,twitter=1),polattention~Age+gender+EducationLevel+EUleave+twitter,weights=wt_demog) ## Added EU
+polatttwitter17.4<-lm(data = subset(bes17,twitter=1),polattention~Age+gender+EducationLevel+IncomeNonresp+ EUleave+twitter,weights=wt_demog)## Both income and EU 
+```
+
+
+#### 2019 models
+```{r}
+
+### Facebook models
+polattFB19.1<-lm(data = subset(bes19,FB=1),polattention~Age+gender+EducationLevel+FB, weights = wt_demog) ## Original variables
+polattFB19.2<-lm(data = subset(bes19,FB=1),polattention~Age+gender+EducationLevel+IncomeNonresp+FB, weights = wt_demog) ## Income variable
+polattFB19.3<-lm(data = subset(bes19,FB=1),polattention~Age+gender+EducationLevel+EUleave+FB, weights = wt_demog)## EU variable
+polattFB19.4<-lm(data = subset(bes19,FB=1),polattention~Age+gender+EducationLevel+IncomeNonresp+EUleave+FB,weights = wt_demog)## Both income and EU 
+
+### Twitter models
+polatttwitter19.1<-lm(data = subset(bes19,twitter=1),polattention~Age+gender+EducationLevel+twitter, weights = wt_demog)## Original variables
+polatttwitter19.2<-lm(data = subset(bes19,twitter=1),polattention~Age+gender+EducationLevel+IncomeNonresp+twitter, weights = wt_demog)## Income variable
+polatttwitter19.3<-lm(data = subset(bes19,twitter=1),polattention~Age+gender+EducationLevel+EUleave+twitter,weights = wt_demog)## EU variable
+polatttwitter19.4<-lm(data = subset(bes19,twitter=1),polattention~Age+gender+EducationLevel+IncomeNonresp+EUleave+twitter,weights = wt_demog)## Both income and EU 
+
+```
+
+
+
+#### Regression results
+
+The same trend is seen across all models. Firstly, Facebook remained an insignificant predictor of political attention, across all models and both datasets whereas twitter remained a significant predictor of political attention, when controlling for all demographics as well as EU vote choice. 
+The results found indicate that  Facebook users are less politically attentive than non-users. On the other hand, twitter users were more politically attentive than non-users, even after controlling for demographic factors and EU vote choice. This could indicate the general usage of the sites, with Facebook used primarily as a social networking site and twitter as a site to follow trending events.  However, we can see that the relationship between twitter usage and political attention has weakened between 2017 and 2019. The coefficient estimate for twitter usage was 0.48 in 2017, down from 0.71 in 2017. Facebook became a negative predictor of political attention between 2017 and 2019. These changes could be explained by the youth of social media users. Age was a positive predictor, as people got older the more attentive they were. As these social media sites continue to grow, and more young people use them, these users may be less inclined to follow political events. 
+
+
+#### 2017 OLS output
+```{r}
+tab_model(polattFB17.4,polatttwitter17.4,pred.labels = c("Intercept", "Age", "Female","Education GCSE D-G","GCSE A*-C","A Level","Undergraduate","Postgraduate","Income £5,200-£25,999", "£26,000-£44,999","£45,000-£99,999","£100,000 or more","Income Nonresponse", "Voted Leave","Uses social network","Uses social network"),dv.labels = c("Facebook","Twitter"),
+          string.est = "Coefficient",
+          string.ci = "Conf.Int (95%)",
+          string.p = "P-Value")
+
+```
+
+
+
+
+#### 2019 OLS output
+```{r}
+tab_model(polattFB19.4, polatttwitter19.4,
+          pred.labels = c("Intercept", "Age", "Female","Education GCSE D-G","GCSE A*-C","A Level",
+                          "Undergraduate","Postgraduate","Income £5,200-£25,999", "£26,000-£44,999","£45,000-£99,999","£100,000 or more","Income Nonresponse", "Voted Leave","Uses social network","Uses social network"),dv.labels = c("Facebook","Twitter"),
+          string.est = "Coefficient",
+          string.ci = "Conf.Int (95%)",
+          string.p = "P-Value")
+
+```
+
+
+
+
+
+# Conclusion 
+
+The findings of this replication fit with previous literature. As was found by Hargittai (2015), Blank & Lutz (2016) and the original paper by Mellon and Prosser (2017), social media users are unrepresentative of the British population. Social media representativeness has not changed significantly over the years. Out of a population of around 66 million, 29.6 million in the UK are aged 45 and above. As the age of the population changes and the younger generation grow older and more young people use social media, we may see things shift with social media users providing a better representation of the population.  
+Twitter was shown to be a significant predictor of political attention, even after controlling for income and Brexit. This concurs with the findings of the original paper. It was however interesting to see the weaking of the relationship between social media usage and political attention. Understanding the generalisability of social media users is important, for both academia and policy makers as a weaker generalisability of social media users will impact the spread and influence of information shared on these sites. 
+
+
+
+# Bibliography 
+
+Blank, G. and Lutz, C., 2017. Representativeness of social media in great britain: investigating Facebook, Linkedin, Twitter, Pinterest, Google+, and Instagram. American Behavioral Scientist, 61(7), pp.741-756.
+
+Evans, G. and Tilley, J., 2012. How parties shape class politics: Explaining the decline of the class basis of party support. British journal of political science, pp.137-161
+
+Freese, J., & Peterson, D. (2017). Replication in social science. Annual Review of Sociology, 43, 147-165, doi: 10.1146.
+
+Hargittai, E., 2015. Is bigger always better? Potential biases of big data derived from social network sites. The ANNALS of the American Academy of Political and Social Science, 659(1), pp.63-76.
+
+Hobolt, S.B., 2018. Brexit and the 2017 UK general election. Journal of Common Market Studies, 56(S1), pp.39-50.
+
+
+Mellon, J. and Prosser, C., 2017. Twitter and Facebook are not representative of the general population: Political attitudes and demographics of British social media users. Research & Politics, 4(3), p.2053168017720008.
+
+
+Tankovska,H(2021)Social Media Usage in the United Kingdom(UK)-statistics and facts[online].*Statista*.[viewed 14/05/2021]. Available from:https://www-statista-com.sheffield.idm.oclc.org/topics/3236/social-media-usage-in-the-uk/#dossierSummary__chapter7
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
